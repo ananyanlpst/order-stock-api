@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\Product;
 
 uses(RefreshDatabase::class);
 
@@ -39,5 +40,32 @@ test('cannot create a product with a negative price', function () {
 
     $this->assertDatabaseMissing('products', [
         'sku' => 'TEST-002',
+    ]);
+});
+
+test('can update price without changing other product fields', function () {
+    $product = Product::create([
+        'sku' => 'TEST-003',
+        'name' => 'Pen',
+        'price' => 15,
+        'stock_quantity' => 50,
+    ]);
+
+    $response = $this->patchJson("/api/products/{$product->id}", [
+        'price' => 20,
+    ]);
+
+    $response
+        ->assertOk()
+        ->assertJsonPath('data.price', '20.00')
+        ->assertJsonPath('data.name', 'Pen')
+        ->assertJsonPath('data.stock_quantity', 50);
+
+    $this->assertDatabaseHas('products', [
+        'id' => $product->id,
+        'sku' => 'TEST-003',
+        'name' => 'Pen',
+        'price' => 20,
+        'stock_quantity' => 50,
     ]);
 });
