@@ -69,3 +69,32 @@ test('can update price without changing other product fields', function () {
         'stock_quantity' => 50,
     ]);
 });
+
+test('cannot create a product with a duplicate sku', function(){
+    Product::create([
+        'sku' => 'TEST-004',
+        'name' => 'Original Pen',
+        'price' => 15,
+        'stock_quantity' => 50,
+    ]);
+
+    $response = $this->postJson('/api/products', [
+        'sku' => 'TEST-004',
+        'name' => 'Duplicate Pen',
+        'price' => 20,
+        'stock_quantity' => 10
+    ]);
+
+    $response
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['sku']);
+    
+    $this->assertDatabaseCount('products', 1);
+
+    $this->assertDatabaseHas('products', [
+        'sku' => 'TEST-004',
+        'name' => 'Original Pen',
+        'price' => 15,
+        'stock_quantity' => 50,
+    ]);
+});
