@@ -108,3 +108,23 @@ test('cannot create a product with a duplicate sku', function(){
         'stock_quantity' => 50,
     ]);
 });
+
+test('admin can delete a product', function () {
+    $product = Product::create([
+        'sku' => 'DELETE-001',
+        'name' => 'Pen',
+        'price' => 15,
+        'stock_quantity' => 10,
+    ]);
+
+    $this->deleteJson("/api/products/{$product->id}")
+        ->assertOk()
+        ->assertJsonPath('message', 'Product deleted successfully.');
+
+    $this->assertDatabaseMissing('products', [
+        'id' => $product->id,
+    ]);
+
+    $this->getJson("/api/products/{$product->id}")
+        ->assertNotFound();
+});
