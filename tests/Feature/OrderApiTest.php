@@ -4,6 +4,7 @@ use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use App\Models\Order;
 
 uses(RefreshDatabase::class);
 
@@ -162,4 +163,146 @@ test('can calculate the total for multiple products', function () {
         'id' => $notebook->id,
         'stock_quantity' => 2,
     ]);
+});
+
+test('staff can only list their own orders', function () {
+    $staff = User::factory()->create([
+        'role' => 'staff',
+    ]);
+
+    $otherUser = User::factory()->create();
+
+    $ownOrder = Order::create([
+        'user_id' => $staff->id,
+        'status' => 'confirmed',
+        'total_amount' => '100.00',
+    ]);
+
+    $otherOrder = Order::create([
+        'user_id' => $otherUser->id,
+        'status' => 'confirmed',
+        'total_amount' => '200.00',
+    ]);
+
+    Sanctum::actingAs($staff);
+
+    $this->getJson('/api/orders')
+        ->assertOk()
+        ->assertJsonPath('total', 1)
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $ownOrder->id)
+        ->assertJsonMissing([
+            'id' => $otherOrder->id,
+            'user_id' => $otherUser->id,
+        ]);
+});
+
+test('admin can list orders from all users', function () {
+    $admin = User::factory()->create([
+        'role' => 'admin',
+    ]);
+
+    $staff = User::factory()->create([
+        'role' => 'staff',
+    ]);
+
+    $adminOrder = Order::create([
+        'user_id' => $admin->id,
+        'status' => 'confirmed',
+        'total_amount' => '100.00',
+    ]);
+
+    $staffOrder = Order::create([
+        'user_id' => $staff->id,
+        'status' => 'confirmed',
+        'total_amount' => '200.00',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $this->getJson('/api/orders')
+        ->assertOk()
+        ->assertJsonPath('total', 2)
+        ->assertJsonCount(2, 'data')
+        ->assertJsonPath('data.0.id', $staffOrder->id)
+        ->assertJsonPath('data.1.id', $adminOrder->id);
+});
+
+
+test('staff cannot view another users order', function () {
+    $owner = User::factory()->create();
+
+    $otherStaff = User::factory()->create([
+        'role' => 'staff',
+    ]);
+
+    $order = Order::create([
+        'user_id' => $owner->id,
+        'status' => 'confirmed',
+        'total_amount' => '100.00',
+    ]);
+
+    Sanctum::actingAs($otherStaff);
+
+    $this->getJson("/api/orders/{$order->id}")
+        ->assertForbidden()
+        ->assertJsonMissingPath('data');
+});
+
+test('staff can view their own order with items', function () {
+    $staff = User::factory()->create([
+        'role' => 'staff',
+    ]);
+
+    Sanctum::actingAs($staff);
+
+    $product = Product::create([
+        'sku' => 'DETAIL-001',
+        'name' => 'Pen',
+        'price' => '15.50',
+        'stock_quantity' => 10,
+    ]);
+
+    $created = $this->postJson('/api/orders', [
+        'items' => [
+            [
+                'product_id' => $product->id,
+                'quantity' => 2,
+            ],
+        ],
+    ])->assertCreated();
+
+    $orderId = $created->json('data.id');
+
+    $this->getJson("/api/orders/{$orderId}")
+        ->assertOk()
+        ->assertJsonPath('data.id', $orderId)
+        ->assertJsonPath('data.user_id', $staff->id)
+        ->assertJsonPath('data.total_amount', '31.00')
+        ->assertJsonCount(1, 'data.items')
+        ->assertJsonPath('data.items.0.product_id', $product->id)
+        ->assertJsonPath('data.items.0.quantity', 2);
+});
+
+test('admin can view another users order', function () {
+    $staff = User::factory()->create([
+        'role' => 'staff',
+    ]);
+
+    $admin = User::factory()->create([
+        'role' => 'admin',
+    ]);
+
+    $order = Order::create([
+        'user_id' => $staff->id,
+        'status' => 'confirmed',
+        'total_amount' => '100.00',
+    ]);
+
+    Sanctum::actingAs($admin);
+
+    $this->getJson("/api/orders/{$order->id}")
+        ->assertOk()
+        ->assertJsonPath('data.id', $order->id)
+        ->assertJsonPath('data.user_id', $staff->id);
 });

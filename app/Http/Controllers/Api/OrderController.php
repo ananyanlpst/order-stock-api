@@ -9,9 +9,25 @@ use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Http\Request;
 
 class OrderController extends Controller
 {
+    public function index(Request $request): JsonResponse
+    {
+        $query = Order::query();
+
+        if ($request->user()->role !== 'admin') {
+            $query->where('user_id', $request->user()->id);
+        }
+
+        $orders = $query
+            ->orderBy('id', 'desc')
+            ->paginate(10);
+
+        return response()->json($orders);
+    }
+
     public function store(StoreOrderRequest $request): JsonResponse
     {
         $validated = $request->validated();
@@ -87,5 +103,18 @@ class OrderController extends Controller
     {
         return intdiv($cents, 100) . '.'
             . str_pad((string) ($cents % 100), 2, '0', STR_PAD_LEFT);
+    }
+
+    public function show(Request $request, Order $order): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->role !== 'admin' && $order->user_id !== $user->id) {
+            abort(403, 'You cannot view this order.');
+        }
+
+        return response()->json([
+            'data' => $order->load('items'),
+        ]);
     }
 }
