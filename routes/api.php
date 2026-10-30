@@ -12,9 +12,9 @@ Route::get('/user', function (Request $request) {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/products', [ProductController::class, 'index']);
     Route::get('/products/{product}', [ProductController::class, 'show']);
-    Route::post('/products', [ProductController::class, 'store']);
-    Route::patch('/products/{product}', [ProductController::class, 'update']);
-    Route::delete('/products/{product}', [ProductController::class, 'destroy']);
+    Route::post('/products', [ProductController::class, 'store'])->middleware('can:manage-products');
+    Route::patch('/products/{product}', [ProductController::class, 'update'])->middleware('can:manage-products');
+    Route::delete('/products/{product}', [ProductController::class, 'destroy'])->middleware('can:manage-products');
     Route::post('/logout', [AuthController::class, 'logout']);
 });
 

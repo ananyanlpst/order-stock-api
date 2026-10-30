@@ -8,7 +8,11 @@ use Laravel\Sanctum\Sanctum;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    Sanctum::actingAs(User::factory()->create());
+    $user = User::factory()->create([
+        'role' => 'admin',
+    ]);
+
+    Sanctum::actingAs($user);
 });
 
 test('can create a product', function () {
