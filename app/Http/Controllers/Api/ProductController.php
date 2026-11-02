@@ -7,6 +7,8 @@ use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Models\OrderItem;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -79,6 +81,14 @@ class ProductController extends Controller
 
     public function destroy(Product $product): JsonResponse
     {
+        if (OrderItem::where('product_id', $product->id)->exists()) {
+            throw ValidationException::withMessages([
+                'product' => [
+                    'Products with order history cannot be deleted.',
+                ],
+            ]);
+        }
+
         $product->delete();
 
         return response()->json([

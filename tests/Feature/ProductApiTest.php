@@ -4,6 +4,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Models\Product;
 use App\Models\User;
 use Laravel\Sanctum\Sanctum;
+use App\Models\Order;
 
 uses(RefreshDatabase::class);
 
@@ -127,4 +128,41 @@ test('admin can delete a product', function () {
 
     $this->getJson("/api/products/{$product->id}")
         ->assertNotFound();
+});
+
+test('cannot delete a product with order history', function(){
+    $product = Product::create([
+        'sku' => 'HISTORY-001',
+        'name' => 'Pen',
+        'price' => '15.00',
+        'stock_quantity' => 10,
+    ]);
+
+    $order = Order::create([
+        'user_id' => auth()->id(),
+        'status' => 'cancelled',
+        'total_amount' => '30.00',
+    ]);
+
+    $order->items()->create([
+        'product_id' => $product->id,
+        'product_sku' => $product->sku,
+        'product_name' => $product->name,
+        'quantity' => 2,
+        'unit_price' => '15.00',
+        'subtotal' => '30.00',
+    ]);
+
+    $this->deleteJson("/api/products/{$product->id}")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['product']);
+
+    $this->assertDatabaseHas('products', [
+        'id' => $product->id
+    ]);
+
+    $this->assertDatabaseHas('order_items', [
+        'order_id' => $order->id,
+        'product_id' => $product->id,
+    ]);
 });
