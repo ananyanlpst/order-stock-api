@@ -503,3 +503,49 @@ test('guests cannot create orders', function(){
         'stock_quantity' => 10
     ]);
 });
+
+test('staff can filter their own orders by status', function() {
+    $staff = User::factory()->create([
+        'role' => 'staff'
+    ]);
+
+    $otherUser = User::factory()->create();
+
+    $confirmedOrder = Order::create([
+        'user_id' => $staff->id,
+        'status' => 'confirmed',
+        'total_amount' => '100.00',
+    ]);
+
+    $cancelledOrder = Order::create([
+        'user_id' => $staff->id,
+        'status' => 'cancelled',
+        'total_amount' => '200.00',
+    ]);    
+
+    Order::create([
+        'user_id' => $otherUser->id,
+        'status' => 'confirmed',
+        'total_amount' => '300.00',
+    ]);
+
+    Sanctum::actingAs($staff);
+
+    $this->getJson('/api/orders?status=confirmed')
+        ->assertOk()
+        ->assertJsonPath('total', 1)
+        ->assertJsonPath('data.0.id', $confirmedOrder->id);
+
+    $this->getJson('/api/orders?status=cancelled')
+        ->assertOk()
+        ->assertJsonPath('total', 1)
+        ->assertJsonPath('data.0.id', $cancelledOrder->id);
+});
+
+test('cannot filter orders by an invalid status', function() {
+    Sanctum::actingAs(User::factory()->create());
+
+    $this->getJson('/api/orders?status=invalid')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['status']);
+});

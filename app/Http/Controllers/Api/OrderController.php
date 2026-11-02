@@ -16,15 +16,24 @@ class OrderController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'status' => ['nullable', 'in:confirmed,cancelled'],
+        ]);
+
         $query = Order::query();
 
         if ($request->user()->role !== 'admin') {
             $query->where('user_id', $request->user()->id);
         }
 
+        if (! empty($validated['status'])) {
+            $query->where('status', $validated['status']);
+        }
+
         $orders = $query
             ->orderBy('id', 'desc')
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
 
         return response()->json($orders);
     }
