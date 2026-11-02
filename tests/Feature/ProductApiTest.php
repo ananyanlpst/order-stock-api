@@ -166,3 +166,38 @@ test('cannot delete a product with order history', function(){
         'product_id' => $product->id,
     ]);
 });
+
+test('can search products by name or sku', function() {
+    $pen = Product::create([
+        'sku' => 'SEARCH-001',
+        'name' => 'Blue Pen',
+        'price' => '15.00',
+        'stock_quantity' => 10,
+    ]);
+
+    Product::create([
+        'sku' => 'SEARCH-002',
+        'name' => 'Notebook',
+        'price' => '99.00',
+        'stock_quantity' => 5,
+    ]);
+
+    // ค้นหาจากชื่อ
+    $this->getJson('/api/products?search=Pen')
+        ->assertOk()
+        ->assertJsonPath('total', 1)
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $pen->id);
+    
+    // ค้นหาจาก SKU
+    $this->getJson('/api/products?search=SEARCH-002')
+        ->assertOk()
+        ->assertJsonPath('total', 1)
+        ->assertJsonPath('data.0.name', 'Notebook');
+
+    // ค้นหาแล้วไม่พบ
+    $this->getJson('/api/products?search=NO-MATCH')
+        ->assertOk()
+        ->assertJsonPath('total', 0)
+        ->assertJsonCount(0, 'data');
+});

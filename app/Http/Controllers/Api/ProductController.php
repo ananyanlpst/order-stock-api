@@ -12,9 +12,27 @@ use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $products = Product::orderBy('id', 'desc')->paginate(10);
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $search = trim($validated['search'] ?? '');
+
+        $query = Product::query();
+
+        if ($search !== '') {
+            $query->where(function ($query) use ($search) {
+                $query->where('name', 'like', '%' . $search . '%')
+                    ->orWhere('sku', 'like', '%' . $search . '%');
+            });
+        }
+
+        $products = $query
+            ->orderBy('id', 'desc')
+            ->paginate(10)
+            ->withQueryString();
 
         return response()->json($products);
     }
