@@ -1,58 +1,217 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Order & Stock API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Laravel REST API for managing products, inventory, and orders with role-based access control.
 
-## About Laravel
+## Tech Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Laravel 13 — developed with version 13.39.0
+- PHP 8.4 — developed with version 8.4.27
+- MySQL for local development
+- SQLite in memory for automated tests
+- Laravel Sanctum for API token authentication
+- Pest for automated testing
+- GitHub Actions for continuous integration
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Features
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Login and logout with API tokens
+- Tokens expire after one day
+- Login rate limiting
+- Admin and staff permissions
+- Product CRUD with unique SKU validation
+- Product search by name or SKU
+- Paginated product and order lists
+- Order filtering by status
+- Order creation with stock validation and deduction
+- Order cancellation with stock restoration
+- Protection against repeated cancellation
+- Order item snapshots that preserve purchase-time names, SKUs, and prices
+- Prevention of deleting products referenced by order history
 
-## Learning Laravel
+## Permissions
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+| Action | Admin | Staff |
+|---|---|---|
+| View and search products | Yes | Yes |
+| Create, update, or delete products | Yes | No |
+| Create orders | Yes | Yes |
+| List and view orders | All orders | Own orders |
+| Cancel confirmed orders | All orders | Own orders |
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+All product and order endpoints require authentication.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+## Local Setup
 
-## Agentic Development
+### Requirements
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+- PHP 8.4 with the extensions required by Composer
+- Composer 2
+- MySQL
+- SQLite PHP extension for testing
+
+### Installation
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+git clone https://github.com/ananyanlpst/order-stock-api.git
+cd order-stock-api
+composer install
+cp .env.example .env
+php artisan key:generate
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Create a MySQL database and an application database user.
+Configure the connection in `.env`:
 
-## Contributing
+```dotenv
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=order_stock
+DB_USERNAME=your_database_user
+DB_PASSWORD=your_database_password
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Run migrations and add demo products:
 
-## Code of Conduct
+```bash
+php artisan config:clear
+php artisan migrate
+php artisan db:seed --class=ProductSeeder
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+The product seeder creates missing demo SKUs without resetting existing products.
 
-## Security Vulnerabilities
+Start the local server:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+php artisan serve
+```
 
-## License
+The API base URL is `http://127.0.0.1:8000/api`.
+Laravel Herd can also serve the project.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### Create a Local User
+
+There is currently no public registration endpoint.
+
+Run:
+
+```bash
+php artisan tinker
+```
+
+Create a local account, replacing the example password before running:
+
+```php
+$user = \App\Models\User::create([
+    'name' => 'Local Admin',
+    'email' => 'admin@example.com',
+    'password' => 'REPLACE_WITH_YOUR_LOCAL_PASSWORD',
+]);
+
+$user->role = 'admin';
+$user->save();
+```
+
+Passwords are automatically hashed by the User model.
+New users default to the staff role.
+
+## API Endpoints
+
+Paths below are relative to `/api`.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/login` | Authenticate and issue a token |
+| POST | `/logout` | Revoke the current token |
+| GET | `/user` | Retrieve the authenticated user |
+| GET | `/products` | List or search products |
+| GET | `/products/{product}` | View a product |
+| POST | `/products` | Create a product |
+| PATCH | `/products/{product}` | Update a product |
+| DELETE | `/products/{product}` | Delete a product without order history |
+| GET | `/orders` | List accessible orders |
+| GET | `/orders/{order}` | View an accessible order with items |
+| POST | `/orders` | Create an order |
+| POST | `/orders/{order}/cancel` | Cancel an order and restore stock |
+
+Send these headers when calling protected endpoints:
+
+```http
+Accept: application/json
+Authorization: Bearer YOUR_TOKEN
+```
+
+For JSON request bodies, also send:
+
+```http
+Content-Type: application/json
+```
+
+### Create an Order
+
+```json
+{
+  "items": [
+    {
+      "product_id": 3,
+      "quantity": 2
+    },
+    {
+      "product_id": 4,
+      "quantity": 1
+    }
+  ]
+}
+```
+
+Use product IDs that exist in your database.
+
+Prices and totals are calculated by the server.
+Duplicate product IDs in the same request are rejected.
+
+### Search and Filter
+
+```text
+GET /api/products?search=Pen
+GET /api/orders?status=confirmed
+GET /api/orders?status=cancelled
+```
+
+## Data Integrity
+
+Order creation and cancellation use database transactions.
+
+Product rows are locked with `lockForUpdate()` during stock changes.
+Cancellation also locks the order before checking its status.
+
+If an operation fails, database changes within the transaction are rolled back.
+Cancelling an already cancelled order is rejected before stock is restored again.
+
+Money calculations use integer minor units before being stored as decimal amounts.
+
+## Testing
+
+```bash
+php artisan config:clear
+php artisan test
+```
+
+The test suite uses an in-memory SQLite database configured in `phpunit.xml`.
+
+Tests cover authentication, permissions, product validation, order totals,
+stock deduction, rollback, cancellation, search, and status filtering.
+
+GitHub Actions runs the test suite on pushes to `main` and pull requests
+targeting `main`.
+
+### Testing Limitations
+
+SQLite tests verify application behavior but do not verify MySQL row-locking
+behavior under concurrent requests. Concurrent stock updates require separate
+integration testing against MySQL.
+
+## Project Status
+
+The backend API is under development.
+A React and TypeScript frontend is planned.
