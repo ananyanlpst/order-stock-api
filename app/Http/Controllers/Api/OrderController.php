@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class OrderController extends Controller
 {
@@ -107,11 +108,7 @@ class OrderController extends Controller
 
     public function show(Request $request, Order $order): JsonResponse
     {
-        $user = $request->user();
-
-        if ($user->role !== 'admin' && $order->user_id !== $user->id) {
-            abort(403, 'You cannot view this order.');
-        }
+        Gate::authorize('view', $order);
 
         return response()->json([
             'data' => $order->load('items'),
@@ -120,11 +117,7 @@ class OrderController extends Controller
 
     public function cancel(Request $request, Order $order): JsonResponse
     {
-        $user = $request->user();
-
-        if ($user->role !== 'admin' && $order->user_id !== $user->id) {
-            abort(403, 'You cannot cancel this order.');
-        }
+        Gate::authorize('cancel', $order);
 
         $cancelledOrder = DB::transaction(function () use ($order) {
             $lockedOrder = Order::whereKey($order->id)
