@@ -455,3 +455,51 @@ test('admin can cancel another users order', function(){
         'stock_quantity' => 10
     ]);
 });
+
+test('cannot create an order with duplicate products', function(){
+    Sanctum::actingAs(User::factory()->create());
+
+    $product = Product::create([
+        'sku' => 'DUPLICATE-001',
+        'name' => 'Pen',
+        'price' => '15.00',
+        'stock_quantity' => 10,
+    ]);
+
+    // สร้าง product_id เดียวกัน
+    $this->postJson('/api/orders/', [
+        'items' => [
+            ['product_id' => $product->id, 'quantity' => 2],
+            ['product_id' => $product->id, 'quantity' => 3]
+        ]
+    ])
+    ->assertUnprocessable()
+    ->assertJsonValidationErrors([
+        'items.0.product_id',
+        'items.1.product_id',
+    ]);
+});
+
+test('guests cannot create orders', function(){
+    $product = Product::create([
+        'sku' => 'GUEST-001',
+        'name' => 'Pen',
+        'price' => '15.00',
+        'stock_quantity' => 10,
+    ]);
+
+    $this->postJson('/api/orders', [
+        'items' => [
+            'product_id' => $product->id,
+            'quantity' => 2
+        ]
+    ])->assertUnauthorized();
+
+    $this->assertDatabaseCount('orders', 0);
+    $this->assertDatabaseCount('order_items', 0);
+
+    $this->assertDatabaseHas('products', [
+        'id' => $product->id,
+        'stock_quantity' => 10
+    ]);
+});
