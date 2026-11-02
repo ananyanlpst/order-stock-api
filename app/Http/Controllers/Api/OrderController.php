@@ -117,4 +117,69 @@ class OrderController extends Controller
             'data' => $order->load('items'),
         ]);
     }
+
+    public function cancel(Request $request, Order $order): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->role !== 'admin' && $order->user_id !== $user->id) {
+            abort(403, 'You cannot cancel this order.');
+        }
+
+        $cancelledOrder = DB::transaction(function () use ($order) {
+            $lockedOrder = Order::whereKey($order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedOrder->status !== 'confirmed') {
+                throw ValidationException::withMessages([
+                    'order' => ['Only confirmed orders can be cancelled.'],
+                ]);
+            }
+
+            $items = $lockedOrder->items()
+                ->orderBy('product_id')
+                ->get();
+
+            $products = Product::whereIn(
+                'id',
+                $items->pluck('product_id')
+            )
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            foreach ($items as $item) {
+                $product = $products->get($item->product_id);
+
+                if (! $product) {
+                    throw ValidationException::withMessages([
+                        'order' => ['An order product is unavailable.'],
+                    ]);
+                }
+
+                $newStock = $product->stock_quantity + $item->quantity;
+
+                if ($newStock > 4294967295) {
+                    throw ValidationException::withMessages([
+                        'order' => ['Restoring stock exceeds the allowed limit.'],
+                    ]);
+                }
+
+                $product->increment('stock_quantity', $item->quantity);
+            }
+
+            $lockedOrder->update([
+                'status' => 'cancelled',
+            ]);
+
+            return $lockedOrder->load('items');
+        });
+
+        return response()->json([
+            'message' => 'Order cancelled successfully.',
+            'data' => $cancelledOrder,
+        ]);
+    }
 }

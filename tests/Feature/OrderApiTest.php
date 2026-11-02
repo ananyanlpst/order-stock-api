@@ -306,3 +306,152 @@ test('admin can view another users order', function () {
         ->assertJsonPath('data.id', $order->id)
         ->assertJsonPath('data.user_id', $staff->id);
 });
+
+test('cancelling an order restores stock only once', function () {
+    $staff = User::factory()->create([
+        'role' => 'staff',
+    ]);
+
+    Sanctum::actingAs($staff);
+
+    $product = Product::create([
+        'sku' => 'CANCEL-001',
+        'name' => 'Pen',
+        'price' => '15.00',
+        'stock_quantity' => 10,
+    ]);
+
+    $created = $this->postJson('/api/orders', [
+        'items' => [
+            [
+                'product_id' => $product->id,
+                'quantity' => 2,
+            ],
+        ],
+    ])->assertCreated();
+
+    $orderId = $created->json('data.id');
+
+    // หลังสั่งซื้อ สต็อกเหลือ 8
+    $this->assertDatabaseHas('products', [
+        'id' => $product->id,
+        'stock_quantity' => 8,
+    ]);
+
+    // ยกเลิกครั้งแรกสำเร็จ
+    $this->postJson("/api/orders/{$orderId}/cancel")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'cancelled');
+
+    $this->assertDatabaseHas('orders', [
+        'id' => $orderId,
+        'status' => 'cancelled',
+    ]);
+
+    $this->assertDatabaseHas('products', [
+        'id' => $product->id,
+        'stock_quantity' => 10,
+    ]);
+
+    // ยกเลิกซ้ำต้องถูกปฏิเสธ เพราะสถานะถูกเปลี่ยนเป็น cancelled
+    $this->postJson("/api/orders/{$orderId}/cancel")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['order']);
+
+    // สต็อกต้องยังเป็น 10 ไม่เพิ่มเป็น 12
+    $this->assertDatabaseHas('products', [
+        'id' => $product->id,
+        'stock_quantity' => 10,
+    ]);
+});
+
+test('staff cannot cancel another users order', function () {
+    $owner = User::factory()->create();
+
+    $otherStaff = User::factory()->create([
+        'role' => 'staff',
+    ]);
+
+    $product = Product::create([
+        'sku' => 'CANCEL-002',
+        'name' => 'Pen',
+        'price' => '15.00',
+        'stock_quantity' => 10,
+    ]);
+
+    Sanctum::actingAs($owner);
+
+    $created = $this->postJson('/api/orders', [
+        'items' => [
+            [
+                'product_id' => $product->id,
+                'quantity' => 2,
+            ],
+        ],
+    ])->assertCreated();
+
+    $orderId = $created->json('data.id');
+
+    // เปลี่ยนเป็นผู้ใช้ Staff
+    Sanctum::actingAs($otherStaff);
+
+    $this->postJson("/api/orders/{$orderId}/cancel")
+        ->assertForbidden();
+
+    $this->assertDatabaseHas('orders', [
+        'id' => $orderId,
+        'status' => 'confirmed',
+    ]);
+
+    $this->assertDatabaseHas('products', [
+        'id' => $product->id,
+        'stock_quantity' => 8,
+    ]);
+});
+
+test('admin can cancel another users order', function(){
+    $staff = User::factory()->create([
+        'role' => 'staff'
+    ]);
+
+    $admin = User::factory()->create([
+        'role' => 'admin'
+    ]);
+
+    $product = Product::create([
+        'sku' => 'CANCEL-003',
+        'name' => 'Pen',
+        'price' => '15.00',
+        'stock_quantity' => 10,
+    ]);
+
+    Sanctum::actingAs($staff);
+
+    $created = $this->postJson('/api/orders', [
+        'items' => [
+            [
+                'product_id' => $product->id,
+                'quantity' => 2
+            ],
+        ],
+    ])->assertCreated();
+
+    $orderId = $created->json('data.id');
+
+    Sanctum::actingAs($admin);
+
+    $this->postJson("/api/orders/{$orderId}/cancel")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'cancelled');
+
+    $this->assertDatabaseHas('orders', [
+        'id' => $orderId,
+        'user_id' => $staff->id,
+        'status' => 'cancelled'
+    ]);
+
+    $this->assertDatabaseHas('products', [
+        'id' => $product->id,
+        'stock_quantity' => 10
+    ]);
+});
