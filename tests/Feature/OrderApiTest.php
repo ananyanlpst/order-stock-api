@@ -549,3 +549,41 @@ test('cannot filter orders by an invalid status', function() {
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['status']);
 });
+
+test('order items preserve the purchase price', function() {
+    Sanctum::actingAs(User::factory()->create());
+
+    $product = Product::create([
+        'sku' => 'SNAPSHOT-001',
+        'name' => 'Pen',
+        'price' => '15.00',
+        'stock_quantity' => 10,
+    ]);
+
+    $created = $this->postJson('/api/orders/', [
+        'items' => [
+            [        
+                'product_id' => $product->id,
+                'quantity' =>2
+            ]
+        ]
+    ])->assertCreated();
+
+    $orderId = $created->json('data.id');
+
+    $product->update([
+        'price' => 20
+    ]);
+
+    $this->getJson("/api/orders/{$orderId}")
+        ->assertOk()
+        ->assertJsonPath('data.total_amount', '30.00')
+        ->assertJsonPath('data.items.0.unit_price', '15.00')
+        ->assertJsonPath('data.items.0.subtotal', '30.00');
+    
+    $this->assertDatabaseHas('products', [
+        'id' => $product->id,
+        'price' => 20
+    ]);
+
+});
