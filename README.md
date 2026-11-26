@@ -232,7 +232,22 @@ SQLite tests verify application behavior but do not verify MySQL row-locking
 behavior under concurrent requests. Concurrent stock updates require separate
 integration testing against MySQL.
 
-## Project Status
 
-The backend API is under development.
-A React and TypeScript frontend is planned.
+## Project Status & Roadmap
+
+### Implemented
+
+- REST API for products, inventory, and orders
+- Authentication and role-based authorization
+- Product and order management
+- Transaction-based stock management
+- Automated testing with Pest
+- Continuous integration with GitHub Actions
+
+### Planned Improvements
+
+- React and TypeScript frontend
+- Interactive API documentation
+- MySQL concurrency integration testing
+
+This project is part of my professional software development portfolio.
