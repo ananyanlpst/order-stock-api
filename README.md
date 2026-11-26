@@ -1,6 +1,27 @@
-# Order & Stock API
 
-A Laravel REST API for managing products, inventory, and orders with role-based access control.
+# Order & Inventory Management REST API
+
+![PHP](https://img.shields.io/badge/PHP-8.4-777BB4?logo=php&logoColor=white)
+![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-Database-4479A1?logo=mysql&logoColor=white)
+![Pest](https://img.shields.io/badge/Testing-Pest-555555)
+![GitHub Actions](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
+
+A backend portfolio project built with Laravel to manage products, inventory, and orders through a secure REST API.
+
+The project focuses on backend architecture, business logic, role-based access control, data integrity, and automated testing.
+
+## Engineering Highlights
+
+- RESTful API design and implementation
+- Token-based authentication with Laravel Sanctum
+- Role-based access control (Admin and Staff)
+- Database transactions and pessimistic locking
+- Inventory consistency and stock management
+- Historical order data preservation
+- Server-side validation and business logic
+- Automated testing with Pest
+- Continuous integration with GitHub Actions
 
 ## Tech Stack
 
